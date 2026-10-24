@@ -1,0 +1,58 @@
+:root {
+  --bg: #f7f8fa; --panel: #ffffff; --ink: #1d2733; --muted: #5b6776; --line: #e1e5ea;
+  --accent: #0f766e; --accent-ink: #ffffff; --cite: #ecfdf5; --cite-line: #10b981; --warn: #b42318;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #11161c; --panel: #182029; --ink: #e6ebf0; --muted: #9aa6b2; --line: #2a3542;
+    --accent: #2dd4bf; --accent-ink: #062925; --cite: #0f2a26; --cite-line: #2dd4bf; --warn: #f97066;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Bengali", sans-serif; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+.top { background: var(--panel); border-bottom: 1px solid var(--line); padding: 20px 0 0; }
+.brand { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+h1 { margin: 0; font-size: 1.5rem; }
+h2 { font-size: 1rem; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.pitch { color: var(--muted); margin: 6px 0 12px; max-width: 70ch; }
+.badge { font-size: .78rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.badge.live { border-color: var(--accent); color: var(--accent); }
+.tabs { display: flex; gap: 4px; }
+.tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; font: inherit;
+  color: var(--muted); cursor: pointer; text-decoration: none; }
+.tab.active { color: var(--ink); border-bottom-color: var(--accent); }
+.tab.link { margin-left: auto; }
+.panel { padding: 20px 0; }
+.ask { display: flex; gap: 8px; flex-wrap: wrap; }
+.ask input { flex: 1 1 320px; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel); color: var(--ink); font: inherit; }
+.ask select, .ask button { padding: 10px 12px; border-radius: 8px; font: inherit; border: 1px solid var(--line);
+  background: var(--panel); color: var(--ink); }
+.ask button { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; cursor: pointer; }
+.samples { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 20px; }
+.samples button { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px;
+  padding: 4px 10px; font: inherit; font-size: .85rem; cursor: pointer; }
+.answer { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 20px; }
+.answer p { margin: 0; }
+.answer .meta { margin-top: 10px; }
+.cite { display: inline-block; font-size: .78rem; padding: 0 6px; margin: 0 2px; border-radius: 4px;
+  background: var(--cite); border: 1px solid var(--cite-line); color: var(--ink); text-decoration: none; }
+.meta { color: var(--muted); font-size: .85rem; }
+.hits { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.hit { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.hit.cited { border-color: var(--cite-line); box-shadow: inset 3px 0 0 var(--cite-line); }
+.hit header { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: .85rem; color: var(--muted); }
+.hit code { color: var(--ink); }
+.hit pre { white-space: pre-wrap; word-break: break-word; margin: 8px 0 0; font: inherit; font-size: .92rem; }
+.error { color: var(--warn); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+th, td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+th:nth-child(-n+2), td:nth-child(-n+2) { text-align: left; }
+td.best { font-weight: 700; color: var(--accent); }
+.note { color: var(--muted); font-size: .85rem; }
+.foot { color: var(--muted); font-size: .85rem; padding: 24px 16px 40px; }
+.foot a { color: var(--accent); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

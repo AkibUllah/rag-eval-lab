@@ -1,0 +1,10 @@
+{
+  "name": "rag-eval-lab-web",
+  "private": true,
+  "description": "Static UI for rag-eval-lab: live API mode or offline BM25 in the browser",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "test": "node --test tests/"
+  }
+}

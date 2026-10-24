@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RAG Eval Lab</title>
+  <meta name="description" content="Ask questions over a bilingual fintech help centre and see the cited chunks behind every answer, plus the evaluation grid comparing chunkers and retrievers.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand">
+        <h1>RAG Eval Lab</h1>
+        <span id="mode" class="badge">connecting…</span>
+      </div>
+      <p class="pitch">Questions over the Shapla Pay help centre (a fictional Bangladeshi mobile wallet, English and Bangla). Every answer cites the chunks it came from.</p>
+      <nav class="tabs" role="tablist">
+        <button role="tab" class="tab active" data-tab="ask" aria-selected="true">Ask</button>
+        <button role="tab" class="tab" data-tab="eval" aria-selected="false">Evaluation</button>
+        <a class="tab link" href="https://github.com/AkibUllah/rag-eval-lab">Source</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="tab-ask" class="panel">
+      <form id="ask-form" class="ask">
+        <label for="question" class="sr-only">Question</label>
+        <input id="question" name="question" maxlength="500" autocomplete="off"
+               placeholder="e.g. What is the cash out charge when using the app?" required>
+        <select id="retriever" aria-label="Retriever">
+          <option value="hybrid-rerank">hybrid + rerank</option>
+          <option value="hybrid">hybrid (RRF)</option>
+          <option value="bm25">BM25</option>
+          <option value="dense">dense (hashed n-grams)</option>
+        </select>
+        <button type="submit">Ask</button>
+      </form>
+      <div class="samples" id="samples" aria-label="Sample questions"></div>
+
+      <div id="result" hidden>
+        <article class="answer">
+          <h2>Answer</h2>
+          <p id="answer-text"></p>
+          <p class="meta" id="answer-meta"></p>
+        </article>
+        <h2 class="hits-title">Retrieved chunks</h2>
+        <ol id="hits" class="hits"></ol>
+      </div>
+      <p id="error" class="error" hidden></p>
+    </section>
+
+    <section id="tab-eval" class="panel" hidden>
+      <p class="meta" id="eval-meta">Loading the latest comparison…</p>
+      <div class="table-wrap"><table id="eval-table"></table></div>
+      <p class="note">Metrics over the bundled golden set. Retrieval metrics count evidence passages, not chunk ids, so every chunker is scored against the same ground truth. Answers come from the offline extractive answerer; see the README for definitions.</p>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <a href="https://github.com/AkibUllah">Akib Jafor</a> · <a href="https://akibullah.github.io/portfolio">Portfolio</a> · MIT License
+  </footer>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
