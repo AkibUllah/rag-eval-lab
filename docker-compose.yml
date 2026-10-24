@@ -1,0 +1,38 @@
+# API + PostgreSQL/pgvector. The API indexes the bundled corpus on start and stores
+# dense vectors in pgvector; BM25 stays in process.
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: rag
+      POSTGRES_DB: rag
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag -d rag"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      RAG_VECTOR_STORE: pgvector
+      DATABASE_URL: postgresql://rag:rag@db:5432/rag
+      RAG_LLM_PROVIDER: ${RAG_LLM_PROVIDER:-fake}
+      RAG_LLM_MODEL: ${RAG_LLM_MODEL:-}
+      RAG_LLM_BASE_URL: ${RAG_LLM_BASE_URL:-}
+      RAG_LLM_API_KEY: ${RAG_LLM_API_KEY:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      - runs:/srv/rag/runs
+
+volumes:
+  pgdata:
+  runs:
