@@ -1,0 +1,23 @@
+# Render blueprint: one-click deploy of the API + web UI in offline mode.
+# No database is needed (vectors live in memory); set RAG_LLM_* to use a real model.
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: rag-eval-lab
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "8000"
+      - key: RAG_APP_ENV
+        value: production
+      - key: RAG_LOG_LEVEL
+        value: INFO
+      - key: RAG_LLM_PROVIDER
+        value: fake
+      - key: RAG_VECTOR_STORE
+        value: memory

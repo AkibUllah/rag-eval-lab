@@ -1,0 +1,31 @@
+{
+  "name": "rag-eval-lab",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "18"
+    }
+  },
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "4gb"
+  },
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": {
+      "label": "Q&A UI (/) and API docs (/docs)",
+      "onAutoForward": "notify"
+    }
+  },
+  "postCreateCommand": "pip install -e \".[dev,pgvector]\" && rag-eval compare > /dev/null",
+  "postStartCommand": "nohup uvicorn rag_eval_lab.api.main:app --host 0.0.0.0 --port 8000 > /tmp/rag-eval-lab.log 2>&1 &",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  }
+}
