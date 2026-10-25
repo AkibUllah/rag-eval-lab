@@ -4,6 +4,8 @@
 Retrieval-augmented Q&A over a bilingual (English + Bangla) help centre, built around an evaluation harness that measures every chunker and retriever combination against a golden set before anything ships.
 
 [![CI](https://github.com/AkibUllah/rag-eval-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/AkibUllah/rag-eval-lab/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/AkibUllah/rag-eval-lab/actions/workflows/codeql.yml/badge.svg)](https://github.com/AkibUllah/rag-eval-lab/actions/workflows/codeql.yml)
+[![Release](https://img.shields.io/github/v/release/AkibUllah/rag-eval-lab)](https://github.com/AkibUllah/rag-eval-lab/releases)
 ![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -16,6 +18,20 @@ Retrieval-augmented Q&A over a bilingual (English + Bangla) help centre, built a
 | Run in your browser | [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/AkibUllah/rag-eval-lab?quickstart=1) — installs the package, runs `rag-eval compare` once and starts the API on forwarded port 8000: `/` is the UI with all four retrievers, `/docs` is Swagger. |
 | One-click deploy | [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/AkibUllah/rag-eval-lab) — `render.yaml` deploys the Docker image in offline mode (no database, no keys). |
 | Local | `docker compose up` (see Quick Start) |
+
+## Screenshots
+
+![Asking English and Bangla questions and opening the evaluation grid on the live demo](docs/images/demo.gif)
+
+*Live demo: English and Bangla questions answered with citations, then the evaluation grid.*
+
+![Bangla question answered with cited chunks from the BM25 retriever](docs/images/ask-bangla.png)
+
+*Ask tab: a Bangla PIN-reset question answered extractively, every sentence citing the chunk it came from, with retrieval and generation timings.*
+
+![Evaluation grid comparing 12 chunker and retriever configurations](docs/images/evaluation.png)
+
+*Evaluation tab: 3 chunkers × 4 retrievers scored on the 70-question golden set (Recall@5, MRR, nDCG@5, citation precision, faithfulness, abstention).*
 
 ## Why this exists
 
@@ -245,11 +261,11 @@ Covered: Bangla tokenisation edge cases (vowel signs, digit folding, South Asian
 
 ## Roadmap
 
-- Query expansion (synonyms, multi-query) measured on the paraphrase slice, starting with the `q053` miss
-- A held-out split of the golden set so thresholds are tuned on dev and reported on test
-- Cross-encoder reranker behind the existing `Reranker` protocol, compared against the lexical one
-- Real-embedding runs (bge-m3 via Ollama) in the README table next to the hashed baseline
-- Persistent BM25 index so the API does not re-index on restart
+- [ ] Query expansion (synonyms, multi-query) measured on the paraphrase slice, starting with the `q053` miss (#1)
+- [ ] A held-out split of the golden set so thresholds are tuned on dev and reported on test (#2)
+- [ ] Cross-encoder reranker behind the existing `Reranker` protocol, compared against the lexical one (#3)
+- [ ] Real-embedding runs (bge-m3 via Ollama) in the README table next to the hashed baseline (#4)
+- [ ] Persistent BM25 index so the API does not re-index on restart (#5)
 
 ## License
 
