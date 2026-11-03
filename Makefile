@@ -3,7 +3,7 @@ VENV ?= .venv
 PY := $(VENV)/bin/python
 PORT ?= 8000
 
-.PHONY: help venv install dev test test-web lint fmt eval run-eval ask site serve-site docker-up docker-down clean
+.PHONY: help venv install dev test test-web lint fmt eval run-eval tune split-check ask site serve-site docker-up docker-down clean
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -32,11 +32,17 @@ fmt: ## Auto-format and fix lint
 	$(VENV)/bin/ruff format rag_eval_lab tests scripts
 	$(VENV)/bin/ruff check --fix rag_eval_lab tests scripts
 
-eval: ## Compare every chunker x retriever on the golden set
-	$(VENV)/bin/rag-eval compare
+eval: ## Compare every chunker x retriever on the test split of the golden set
+	$(VENV)/bin/rag-eval compare --split test
 
-run-eval: ## Evaluate one configuration (CHUNKER=recursive RETRIEVER=hybrid-rerank)
-	$(VENV)/bin/rag-eval run --chunker $(or $(CHUNKER),recursive) --retriever $(or $(RETRIEVER),hybrid-rerank) --show-misses
+run-eval: ## Evaluate one configuration (CHUNKER=recursive RETRIEVER=hybrid-rerank SPLIT=test)
+	$(VENV)/bin/rag-eval run --chunker $(or $(CHUNKER),recursive) --retriever $(or $(RETRIEVER),hybrid-rerank) --split $(or $(SPLIT),test) --show-misses
+
+tune: ## Sweep the abstention threshold on the dev split
+	$(VENV)/bin/rag-eval tune --chunker $(or $(CHUNKER),recursive) --retriever $(or $(RETRIEVER),hybrid-rerank)
+
+split-check: ## Verify every golden question has a dev/test split and show the balance
+	$(PY) scripts/split_golden.py --check
 
 ask: ## Ask one question: make ask Q="How many cards can I link?"
 	$(VENV)/bin/rag-eval ask "$(Q)"

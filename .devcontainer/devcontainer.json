@@ -17,7 +17,7 @@
       "onAutoForward": "notify"
     }
   },
-  "postCreateCommand": "pip install -e \".[dev,pgvector]\" && rag-eval compare > /dev/null",
+  "postCreateCommand": "pip install -e \".[dev,pgvector]\" && rag-eval compare --split test > /dev/null",
   "postStartCommand": "nohup uvicorn rag_eval_lab.api.main:app --host 0.0.0.0 --port 8000 > /tmp/rag-eval-lab.log 2>&1 &",
   "customizations": {
     "vscode": {

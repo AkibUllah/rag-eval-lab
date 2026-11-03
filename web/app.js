@@ -131,7 +131,8 @@ async function loadEval() {
     $("eval-table").innerHTML =
       `<thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody>`;
     const q = data.runs[0]?.metrics.questions ?? 0;
-    $("eval-meta").textContent = `${data.runs.length} configurations · ${q} questions · k=${k} · generated ${data.created_at.slice(0, 10)}`;
+    const split = data.split ?? "all";
+    $("eval-meta").textContent = `${data.runs.length} configurations · ${split} split · ${q} questions · k=${k} · generated ${data.created_at.slice(0, 10)}`;
   } catch {
     $("eval-meta").textContent = "No comparison report yet. Run `rag-eval compare` and reload.";
   }
