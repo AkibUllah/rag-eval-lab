@@ -38,8 +38,10 @@ jobs:
         run: pytest --cov=rag_eval_lab --cov-report=term-missing
       - name: Test (browser BM25)
         run: node --test web/tests/
-      - name: Evaluation smoke run
-        run: rag-eval compare --runs-dir /tmp/runs | tail -n 25
+      - name: Golden set split check
+        run: python scripts/split_golden.py --check
+      - name: Evaluation smoke run (test split)
+        run: rag-eval compare --split test --runs-dir /tmp/runs | tail -n 30
 
   docker:
     name: docker build
