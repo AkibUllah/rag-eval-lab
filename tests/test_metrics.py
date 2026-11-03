@@ -87,3 +87,22 @@ def test_mean_and_percentile():
     assert m.mean([None]) is None
     assert m.percentile([5, 1, 3, 2, 4], 50) == 3
     assert m.percentile([], 95) == 0.0
+
+
+def test_bootstrap_ci_brackets_the_mean_and_is_seeded():
+    values = [1.0, 0.0, 1.0, 1.0, 0.5, None, 0.0, 1.0]
+    low, high = m.bootstrap_ci(values)
+    assert 0.0 <= low <= m.mean(values) <= high <= 1.0
+    assert m.bootstrap_ci(values) == (low, high)
+    spread = [i / 37 for i in range(30)]
+    assert m.bootstrap_ci(spread, seed=1) != m.bootstrap_ci(spread, seed=2)
+    narrow = m.bootstrap_ci(values, confidence=0.5)
+    assert low <= narrow[0] <= narrow[1] <= high
+
+
+def test_bootstrap_ci_edge_cases():
+    assert m.bootstrap_ci([]) is None
+    assert m.bootstrap_ci([None, None]) is None
+    assert m.bootstrap_ci([0.75] * 5) == (0.75, 0.75)
+    with pytest.raises(ValueError, match="confidence"):
+        m.bootstrap_ci([1.0], confidence=1.0)
