@@ -10,8 +10,9 @@ from pathlib import Path
 from rag_eval_lab.chunking import CHUNKERS, chunk_documents, get_chunker
 from rag_eval_lab.config import Settings
 from rag_eval_lab.documents import load_directory
-from rag_eval_lab.evaluation.dataset import load_golden
+from rag_eval_lab.evaluation.dataset import SPLIT_CHOICES, GoldenSetError, load_golden
 from rag_eval_lab.evaluation.runner import (
+    ci_table,
     compare,
     markdown_table,
     run_eval,
@@ -66,16 +67,22 @@ def cmd_run(args: argparse.Namespace) -> int:
             print("--min-coverage applies to the offline extractive answerer only", file=sys.stderr)
             return 2
         generator = ExtractiveAnswerer(min_coverage=args.min_coverage)
-    run = run_eval(
-        docs,
-        golden,
-        settings,
-        args.chunker,
-        args.retriever,
-        args.k,
-        generator=generator,
-        support=support,
-    )
+    try:
+        run = run_eval(
+            docs,
+            golden,
+            settings,
+            args.chunker,
+            args.retriever,
+            args.k,
+            generator=generator,
+            support=support,
+            split=args.split,
+        )
+    except GoldenSetError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    print(f"split: {run.split} ({int(run.metrics['questions'] or 0)} questions), k={run.k}\n")
     print(markdown_table([run]))
     mt = run.metrics
     print(
@@ -84,6 +91,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         f"(generator: {run.generator})\n"
     )
     print(tag_table(run))
+    print(f"\n95% bootstrap intervals over answerable questions (split: {run.split}):\n")
+    print(ci_table(run))
     if args.show_misses:
         misses = run.misses()
         print(f"\nMisses (no evidence in top {run.k}): {len(misses)}")
@@ -98,13 +107,25 @@ def cmd_compare(args: argparse.Namespace) -> int:
     settings = _settings(args)
     docs = load_directory(settings.corpus_dir)
     golden = load_golden(settings.golden_path)
-    runs = compare(docs, golden, settings, args.chunkers, args.retrievers, args.k)
+    try:
+        runs = compare(
+            docs, golden, settings, args.chunkers, args.retrievers, args.k, split=args.split
+        )
+    except GoldenSetError as exc:
+        print(exc, file=sys.stderr)
+        return 2
     table = markdown_table(runs)
-    print(f"{len(docs)} documents, {len(golden)} questions, k={args.k}\n")
+    n_questions = int(runs[0].metrics["questions"] or 0)
+    print(f"{len(docs)} documents, {n_questions} questions (split: {args.split}), k={args.k}\n")
     print(table)
     best = max(runs, key=lambda r: (r.metrics["ndcg@k"] or 0, r.metrics["recall@k"] or 0))
-    print(f"\nbest by nDCG@{args.k}: {best.label}\n")
+    print(f"\nbest by nDCG@{args.k}: {best.label}")
+    if args.split == "test":
+        print("(test numbers are for reporting; choose configurations with --split dev)")
+    print()
     print(tag_table(best))
+    print(f"\n95% bootstrap intervals for {best.label}:\n")
+    print(ci_table(best))
     json_path, md_path = save_comparison(runs, settings.runs_dir)
     print(f"\nsaved {json_path} and {md_path}")
     if args.markdown:
@@ -168,9 +189,16 @@ def build_parser() -> argparse.ArgumentParser:
     common.add_argument("--golden", help="golden set JSONL (default: data/golden.jsonl)")
     common.add_argument("--runs-dir", help="where run reports are written (default: runs/)")
     common.add_argument("--k", type=int, default=5, help="retrieval depth (default 5)")
+    evals = argparse.ArgumentParser(add_help=False)
+    evals.add_argument(
+        "--split",
+        choices=SPLIT_CHOICES,
+        default="all",
+        help="golden-set split to evaluate: tune on dev, report on test (default: all)",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    run = sub.add_parser("run", parents=[common], help="evaluate one configuration")
+    run = sub.add_parser("run", parents=[common, evals], help="evaluate one configuration")
     run.add_argument("--chunker", choices=list(CHUNKERS), default="recursive")
     run.add_argument("--retriever", choices=RETRIEVERS, default="hybrid-rerank")
     run.add_argument("--judge", action="store_true", help="LLM-judge faithfulness (needs provider)")
@@ -181,7 +209,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--no-save", action="store_true", help="do not write a run report")
     run.set_defaults(func=cmd_run)
 
-    cmp_ = sub.add_parser("compare", parents=[common], help="evaluate a grid, print a table")
+    cmp_ = sub.add_parser("compare", parents=[common, evals], help="evaluate a grid, print a table")
     cmp_.add_argument("--chunkers", type=lambda v: _csv(v, list(CHUNKERS)), default=list(CHUNKERS))
     cmp_.add_argument("--retrievers", type=lambda v: _csv(v, RETRIEVERS), default=list(RETRIEVERS))
     cmp_.add_argument("--markdown", help="also write the table to this file")
