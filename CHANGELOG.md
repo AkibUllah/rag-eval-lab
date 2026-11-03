@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Dev/test split of the golden set (49/21): a deterministic, stratified `split` field assigned by a seeded hash of the question id, stored in `data/golden.jsonl` and validated on load (`GoldenSetError` on unknown values). `scripts/split_golden.py` places new questions without moving existing ones; `--check` runs in CI (#2).
+- `--split dev|test|all` on `rag-eval run` and `rag-eval compare` (default `all`, the previous behaviour); run and comparison reports record the split.
+- `rag-eval tune`: sweeps the extractive answerer's `min_coverage` on the dev split and refuses test or unassigned questions.
+- Seeded bootstrap 95% confidence intervals for Recall@k, MRR, nDCG@k, Hit@k and answer F1 in run reports and CLI output.
 - Screenshots and an animated walkthrough of the live demo in the README.
 - CodeQL code scanning workflow (Python, JavaScript and Actions) and Dependabot updates for pip, Docker and GitHub Actions.
 - Roadmap tracked as GitHub issues under the v0.2.0 milestone.
@@ -16,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- README results, `make eval`, the CI smoke run, the Codespaces setup and the Pages evaluation grid now report the test split; the README table comes from a fresh run.
 - CI workflow runs with a read-only `GITHUB_TOKEN` by default.
 
 ## [0.1.0] - 2026-10-25
