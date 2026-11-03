@@ -1,9 +1,11 @@
 import dataclasses
+import importlib.util
 import json
 import random
 
 import pytest
 
+from rag_eval_lab.config import PROJECT_ROOT
 from rag_eval_lab.evaluation.dataset import (
     Evidence,
     GoldenItem,
@@ -18,6 +20,7 @@ from rag_eval_lab.evaluation.split import (
     stratum,
     target_test_size,
 )
+from tests.conftest import GOLDEN
 
 
 def _item(i: int, tags: list[str], answerable: bool = True, split: str | None = None):
@@ -123,3 +126,42 @@ def test_select_split_filters_and_fails_loudly():
     assert len(select_split(unassigned, "all")) == 4
     with pytest.raises(GoldenSetError, match="1 golden items have no split"):
         select_split(unassigned, "test")
+
+
+def _split_script():
+    path = PROJECT_ROOT / "scripts" / "split_golden.py"
+    spec = importlib.util.spec_from_file_location("split_golden", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_bundled_split_is_reproducible(golden):
+    stored = {i.id: i.split for i in golden}
+    assert assign_splits(golden, keep_existing=False) == stored
+
+
+def test_bundled_split_is_balanced_across_languages_and_tags(golden):
+    summary = split_summary(golden)
+    assert summary["all"] == {"dev": 49, "test": 21}
+    for key in ("lang:en", "lang:bn", "tag:lexical", "tag:paraphrase", "tag:numeric"):
+        counts = summary[key]
+        assert 0.2 <= counts["test"] / (counts["dev"] + counts["test"]) <= 0.4, key
+    for key, counts in summary.items():
+        assert counts["dev"] >= 1 and counts["test"] >= 1, key
+
+
+def test_split_script_assigns_new_questions_and_checks(tmp_path, capsys):
+    script = _split_script()
+    path = tmp_path / "golden.jsonl"
+    lines = GOLDEN.read_text(encoding="utf-8").splitlines()
+    new = {"id": "q999", "question": "new?", "relevant": [], "tags": ["unanswerable"]}
+    path.write_text("\n".join([*lines, json.dumps(new)]) + "\n", encoding="utf-8")
+    assert script.main(["--golden", str(path), "--check"]) == 1
+    assert "1 questions have no split: q999" in capsys.readouterr().out
+    assert script.main(["--golden", str(path)]) == 0
+    assert "1 of 71 questions assigned" in capsys.readouterr().out
+    rewritten = path.read_text(encoding="utf-8").splitlines()
+    assert rewritten[:70] == lines  # existing questions untouched, byte for byte
+    assert json.loads(rewritten[70])["split"] in ("dev", "test")
+    assert script.main(["--golden", str(path), "--check"]) == 0
