@@ -13,7 +13,13 @@ from typing import Any
 from rag_eval_lab.config import Settings
 from rag_eval_lab.documents import Document
 from rag_eval_lab.evaluation import metrics as m
-from rag_eval_lab.evaluation.dataset import GoldenItem, covers, resolve
+from rag_eval_lab.evaluation.dataset import (
+    GoldenItem,
+    GoldenSetError,
+    covers,
+    resolve,
+    select_split,
+)
 from rag_eval_lab.generation.base import Generator
 from rag_eval_lab.pipeline import build_pipeline
 from rag_eval_lab.text import word_count
@@ -30,6 +36,14 @@ METRIC_LABELS: dict[str, str] = {
     "abstain_accuracy": "Abstain acc",
 }
 HIGHER_IS_BETTER = tuple(METRIC_LABELS)
+# Per-question fields behind the headline metrics that get a bootstrap interval.
+CI_FIELDS: dict[str, str] = {
+    "recall@k": "recall",
+    "mrr": "reciprocal_rank",
+    "ndcg@k": "ndcg",
+    "hit@k": "hitk",
+    "f1": "f1",
+}
 
 
 @dataclass
@@ -65,6 +79,8 @@ class EvalRun:
     n_chunks: int
     metrics: dict[str, float | None]
     by_tag: dict[str, dict[str, float | None]]
+    split: str = "all"
+    ci: dict[str, list[float] | None] = field(default_factory=dict)
     questions: list[QuestionResult] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     environment: dict[str, str] = field(
@@ -107,6 +123,17 @@ def _aggregate(results: list[QuestionResult]) -> dict[str, float | None]:
     }
 
 
+def _confidence_intervals(
+    results: list[QuestionResult], confidence: float = 0.95
+) -> dict[str, list[float] | None]:
+    answerable = [r for r in results if r.answerable]
+    out: dict[str, list[float] | None] = {}
+    for key, attr in CI_FIELDS.items():
+        interval = m.bootstrap_ci([getattr(r, attr) for r in answerable], confidence)
+        out[key] = None if interval is None else [round(v, 4) for v in interval]
+    return out
+
+
 def run_eval(
     docs: list[Document],
     golden: list[GoldenItem],
@@ -116,8 +143,13 @@ def run_eval(
     k: int = 5,
     generator: Generator | None = None,
     support: m.SupportFn | None = None,
+    split: str = "all",
 ) -> EvalRun:
-    items = resolve(golden, docs)
+    """Evaluate one configuration on one split of the golden set (``all`` by default)."""
+    selected = select_split(golden, split)
+    if not selected:
+        raise GoldenSetError(f"no golden questions in split {split!r}")
+    items = resolve(selected, docs)
     pipe = build_pipeline(settings, chunker, retriever)
     if generator is not None:
         pipe.generator = generator
@@ -202,6 +234,8 @@ def run_eval(
         n_chunks=len(chunks),
         metrics=_aggregate(results),
         by_tag=by_tag,
+        split=split,
+        ci=_confidence_intervals(results),
         questions=results,
     )
 
@@ -213,8 +247,11 @@ def compare(
     chunkers: list[str],
     retrievers: list[str],
     k: int = 5,
+    split: str = "all",
 ) -> list[EvalRun]:
-    return [run_eval(docs, golden, settings, c, r, k) for c in chunkers for r in retrievers]
+    return [
+        run_eval(docs, golden, settings, c, r, k, split=split) for c in chunkers for r in retrievers
+    ]
 
 
 def _fmt(value: float | None, digits: int = 3) -> str:
@@ -256,6 +293,18 @@ def markdown_table(runs: list[EvalRun]) -> str:
     return "\n".join(lines)
 
 
+def ci_table(run: EvalRun) -> str:
+    """Headline metrics with their 95% bootstrap intervals over answerable questions."""
+    lines = ["| Metric | Value | 95% CI |", "|---|---:|---:|"]
+    for key in CI_FIELDS:
+        interval = run.ci.get(key)
+        span = "–" if not interval else f"{interval[0]:.3f} – {interval[1]:.3f}"
+        lines.append(
+            f"| {METRIC_LABELS[key].format(k=run.k)} | {_fmt(run.metrics[key])} | {span} |"
+        )
+    return "\n".join(lines)
+
+
 def tag_table(run: EvalRun, tags: list[str] | None = None) -> str:
     k = run.k
     tags = tags or list(run.by_tag)
@@ -290,6 +339,7 @@ def save_comparison(runs: list[EvalRun], runs_dir: Path) -> tuple[Path, Path]:
     payload = {
         "created_at": datetime.now(timezone.utc).isoformat(),
         "k": runs[0].k if runs else None,
+        "split": runs[0].split if runs else None,
         "runs": [r.to_dict(include_questions=False) for r in runs],
         "markdown": markdown_table(runs),
     }

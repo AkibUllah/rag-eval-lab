@@ -10,6 +10,7 @@ from rag_eval_lab.evaluation.dataset import (
     resolve,
 )
 from rag_eval_lab.evaluation.runner import (
+    ci_table,
     compare,
     latest,
     markdown_table,
@@ -83,3 +84,33 @@ def test_reports_are_saved_and_latest_is_found(corpus, golden, settings):
     json_path, md_path = save_comparison([run], settings.runs_dir)
     assert latest(settings.runs_dir, "compare")["runs"][0]["chunker"] == "sentence"
     assert md_path.read_text().startswith("| Chunker")
+
+
+def test_run_eval_on_one_split_records_it_with_intervals(corpus, golden, settings):
+    test = run_eval(corpus, golden, settings, "recursive", "bm25", k=5, split="test")
+    dev = run_eval(corpus, golden, settings, "recursive", "bm25", k=5, split="dev")
+    assert (test.split, dev.split) == ("test", "dev")
+    assert (test.metrics["questions"], dev.metrics["questions"]) == (21, 49)
+    assert not {q.id for q in test.questions} & {q.id for q in dev.questions}
+    assert set(test.ci) == {"recall@k", "mrr", "ndcg@k", "hit@k", "f1"}
+    for key, (low, high) in test.ci.items():
+        assert low <= test.metrics[key] <= high, key
+    table = ci_table(test)
+    assert table.splitlines()[0] == "| Metric | Value | 95% CI |"
+    assert f"| MRR | {test.metrics['mrr']:.3f} | {test.ci['mrr'][0]:.3f} – " in table
+
+
+def test_run_eval_rejects_unknown_or_empty_splits(corpus, golden, settings):
+    with pytest.raises(GoldenSetError, match="unknown split"):
+        run_eval(corpus, golden, settings, "recursive", "bm25", split="holdout")
+    dev_only = [g for g in golden if g.split == "dev"]
+    with pytest.raises(GoldenSetError, match="no golden questions in split 'test'"):
+        run_eval(corpus, dev_only, settings, "recursive", "bm25", split="test")
+
+
+def test_comparison_report_states_its_split(corpus, golden, settings):
+    runs = compare(corpus, golden, settings, ["recursive"], ["bm25"], k=3, split="test")
+    json_path, _ = save_comparison(runs, settings.runs_dir)
+    data = json.loads(json_path.read_text())
+    assert data["split"] == "test" and data["runs"][0]["split"] == "test"
+    assert data["runs"][0]["ci"]["mrr"] is not None

@@ -12,6 +12,8 @@ import re
 from collections import Counter
 from collections.abc import Callable, Sequence
 
+import numpy as np
+
 from rag_eval_lab.documents import Chunk
 from rag_eval_lab.evaluation.dataset import Evidence, covers
 from rag_eval_lab.generation.base import CITATION_RE, Answer, strip_citations
@@ -138,6 +140,30 @@ def faithfulness(
 def mean(values: Sequence[float | None]) -> float | None:
     present = [v for v in values if v is not None]
     return sum(present) / len(present) if present else None
+
+
+def bootstrap_ci(
+    values: Sequence[float | None],
+    confidence: float = 0.95,
+    n_resamples: int = 2000,
+    seed: int = 0,
+) -> tuple[float, float] | None:
+    """Percentile bootstrap interval for the mean of per-question scores.
+
+    Questions are resampled with replacement; ``None`` values (metric not defined for
+    that question) are dropped first. Seeded, so a report is reproducible.
+    """
+    if not 0.0 < confidence < 1.0:
+        raise ValueError(f"confidence must be between 0 and 1, got {confidence}")
+    present = np.array([v for v in values if v is not None], dtype=float)
+    if present.size == 0:
+        return None
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, present.size, size=(n_resamples, present.size))
+    means = present[idx].mean(axis=1)
+    tail = (1.0 - confidence) / 2 * 100
+    low, high = np.percentile(means, [tail, 100 - tail])
+    return float(low), float(high)
 
 
 def percentile(values: Sequence[float], q: float) -> float:
