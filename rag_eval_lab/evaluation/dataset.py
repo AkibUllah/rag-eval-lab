@@ -4,6 +4,10 @@ Each golden item names its evidence as ``{"doc": id, "evidence": "verbatim passa
 instead of chunk ids. Evidence is resolved to a character span once, and a chunk is
 relevant when it covers at least ``MIN_COVERAGE`` of that span. This keeps one golden
 set valid for every chunker (ids like ``fees#3`` differ between strategies).
+
+Items also carry a ``split`` (``dev`` or ``test``, see ``evaluation/split.py``): settings
+are tuned on dev and results are reported on test, so the reported numbers are not
+measured on the questions they were chosen with.
 """
 
 from __future__ import annotations
@@ -15,6 +19,8 @@ from pathlib import Path
 from rag_eval_lab.documents import Chunk, Document
 
 MIN_COVERAGE = 0.5
+SPLITS = ("dev", "test")
+SPLIT_CHOICES = (*SPLITS, "all")
 
 
 class GoldenSetError(ValueError):
@@ -36,6 +42,7 @@ class GoldenItem:
     evidence: list[Evidence]
     answer: str = ""
     tags: list[str] = field(default_factory=list)
+    split: str | None = None
 
     @property
     def answerable(self) -> bool:
@@ -60,14 +67,37 @@ def load_golden(path: str | Path) -> list[GoldenItem]:
                 evidence=[Evidence(r["doc"], r["evidence"]) for r in raw.get("relevant", [])],
                 answer=raw.get("answer", ""),
                 tags=list(raw.get("tags", [])),
+                split=raw.get("split"),
             )
         except (json.JSONDecodeError, KeyError, TypeError) as exc:
             raise GoldenSetError(f"{path}:{lineno}: invalid golden item ({exc})") from exc
+        if item.split is not None and item.split not in SPLITS:
+            raise GoldenSetError(
+                f"{path}:{lineno}: unknown split {item.split!r} for {item.id} "
+                f"(expected one of {', '.join(SPLITS)})"
+            )
         if item.id in seen:
             raise GoldenSetError(f"{path}:{lineno}: duplicate id {item.id}")
         seen.add(item.id)
         items.append(item)
     return items
+
+
+def select_split(items: list[GoldenItem], split: str) -> list[GoldenItem]:
+    """Items of one split; ``all`` returns every item, assigned or not."""
+    if split not in SPLIT_CHOICES:
+        raise GoldenSetError(
+            f"unknown split {split!r} (expected one of {', '.join(SPLIT_CHOICES)})"
+        )
+    if split == "all":
+        return list(items)
+    missing = [item.id for item in items if item.split is None]
+    if missing:
+        raise GoldenSetError(
+            f"{len(missing)} golden items have no split (first: {missing[0]}); "
+            "assign one with scripts/split_golden.py"
+        )
+    return [item for item in items if item.split == split]
 
 
 def resolve(items: list[GoldenItem], docs: list[Document]) -> list[GoldenItem]:
@@ -84,7 +114,7 @@ def resolve(items: list[GoldenItem], docs: list[Document]) -> list[GoldenItem]:
             if start < 0:
                 raise GoldenSetError(f"{item.id}: evidence not found in {ev.doc}: {ev.text[:60]!r}")
             resolved.append(Evidence(ev.doc, ev.text, start, start + len(ev.text)))
-        out.append(GoldenItem(item.id, item.question, resolved, item.answer, item.tags))
+        out.append(GoldenItem(item.id, item.question, resolved, item.answer, item.tags, item.split))
     return out
 
 
