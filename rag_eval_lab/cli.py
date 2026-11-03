@@ -1,4 +1,4 @@
-"""``rag-eval`` command line: run, compare, ask, export-index."""
+"""``rag-eval`` command line: run, compare, tune, ask, export-index."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from rag_eval_lab.evaluation.runner import (
     save_run,
     tag_table,
 )
+from rag_eval_lab.evaluation.tuning import sweep_min_coverage, sweep_table
 from rag_eval_lab.generation.extractive import ExtractiveAnswerer
 from rag_eval_lab.generation.llm import LLMJudge, build_provider
 from rag_eval_lab.pipeline import build_pipeline
@@ -34,6 +35,16 @@ def _csv(value: str, allowed: tuple[str, ...] | list[str]) -> list[str]:
         raise argparse.ArgumentTypeError(
             f"unknown: {', '.join(bad)} (choose from {', '.join(allowed)})"
         )
+    return items
+
+
+def _floats(value: str) -> list[float]:
+    try:
+        items = [float(v) for v in value.split(",") if v.strip()]
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"expected comma-separated numbers: {value}") from exc
+    if not items or any(not 0.0 <= v <= 1.0 for v in items):
+        raise argparse.ArgumentTypeError(f"expected values between 0 and 1: {value}")
     return items
 
 
@@ -137,6 +148,44 @@ def cmd_compare(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_tune(args: argparse.Namespace) -> int:
+    settings = _settings(args)
+    if settings.llm_provider != "fake":
+        print("tune sweeps the offline extractive answerer only", file=sys.stderr)
+        return 2
+    docs = load_directory(settings.corpus_dir)
+    golden = load_golden(settings.golden_path)
+    try:
+        points, best = sweep_min_coverage(
+            docs,
+            golden,
+            settings,
+            args.chunker,
+            args.retriever,
+            args.min_coverage,
+            args.k,
+            split=args.split,
+        )
+    except GoldenSetError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    n_questions = int(best.run.metrics["questions"] or 0)
+    print(
+        f"min_coverage sweep for {best.run.label} on split {args.split} "
+        f"({n_questions} questions), k={args.k}\n"
+    )
+    print(sweep_table(points, best))
+    print(
+        f"\nbest: min_coverage={best.min_coverage:g} "
+        "(balanced accuracy of answering vs abstaining, then answer F1)"
+    )
+    print(
+        f"report it on held-out questions: rag-eval run --split test --chunker {args.chunker} "
+        f"--retriever {args.retriever} --min-coverage {best.min_coverage:g}"
+    )
+    return 0
+
+
 def cmd_ask(args: argparse.Namespace) -> int:
     settings = _settings(args)
     pipe = build_pipeline(settings, args.chunker, args.retriever)
@@ -215,6 +264,25 @@ def build_parser() -> argparse.ArgumentParser:
     cmp_.add_argument("--markdown", help="also write the table to this file")
     cmp_.add_argument("--json", help="also write the comparison JSON to this file")
     cmp_.set_defaults(func=cmd_compare)
+
+    tune = sub.add_parser(
+        "tune", parents=[common], help="sweep the abstention threshold on the dev split"
+    )
+    tune.add_argument("--chunker", choices=list(CHUNKERS), default="recursive")
+    tune.add_argument("--retriever", choices=RETRIEVERS, default="hybrid-rerank")
+    tune.add_argument(
+        "--min-coverage",
+        type=_floats,
+        default=[0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6],
+        help="comma-separated thresholds to try (default 0.3 to 0.6 in steps of 0.05)",
+    )
+    tune.add_argument(
+        "--split",
+        choices=SPLIT_CHOICES,
+        default="dev",
+        help="only dev is accepted; test and all are refused so tuning never sees test",
+    )
+    tune.set_defaults(func=cmd_tune)
 
     ask = sub.add_parser("ask", parents=[common], help="answer one question from the corpus")
     ask.add_argument("question")
